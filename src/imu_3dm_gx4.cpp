@@ -160,6 +160,7 @@ int main(int argc, char **argv) {
   int baudrate;
   bool enableFilter;
   bool enableMagUpdate, enableAccelUpdate;
+  bool enableGpsTimeSync;
   int requestedImuRate, requestedFilterRate;
   
   //  load parameters from launch file
@@ -171,7 +172,8 @@ int main(int argc, char **argv) {
   nh.param<bool>("enable_filter", enableFilter, false);
   nh.param<bool>("enable_mag_update", enableMagUpdate, false);
   nh.param<bool>("enable_accel_update", enableAccelUpdate, true);
-  
+  nh.param<bool>("enable_gps_time_sync", enableGpsTimeSync, false);
+
   if (requestedFilterRate < 0 || requestedImuRate < 0) {
     ROS_ERROR("imu_rate and filter_rate must be > 0");
     return -1;
@@ -202,6 +204,8 @@ int main(int argc, char **argv) {
 
     ROS_INFO("Idling the device");
     imu.idle();
+
+    imu.enableGpsTimeSync(enableGpsTimeSync);
 
     //  read back data rates
     uint16_t imuBaseRate, filterBaseRate;

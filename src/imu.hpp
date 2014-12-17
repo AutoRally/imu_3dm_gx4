@@ -164,6 +164,7 @@ public:
       Gyroscope = (1 << 1),
       Magnetometer = (1 << 2),
       Barometer = (1 << 3),
+      GpsTime = (1 << 4),
     };
 
     unsigned int fields; /**< Which fields are valid in the struct */
@@ -172,6 +173,8 @@ public:
     float gyro[3];  /**< Angular rates, units of rad/s */
     float mag[3];   /**< Magnetic field, units of gauss */
     float pressure; /**< Pressure, units of gauss */
+    double gpstow;
+    uint16_t gpsweek;
 
     IMUData() : fields(0) {}
   };
@@ -379,6 +382,13 @@ public:
   void enableFilterStream(bool enabled);
 
   /**
+     * @brief enableGpsTimeSync Enable/disable GPS time syncronization.
+     * This requires system time syncronized to GPS time and PPS input to IMU
+     * @param enabled If true, enable GPS time sync.
+     */
+  void enableGpsTimeSync(bool enabled);
+
+  /**
    * @brief Set the IMU data callback.
    * @note The IMU data callback is called every time new IMU data is read.
    */
@@ -419,6 +429,7 @@ private:
   std::vector<uint8_t> buffer_;
   std::deque<uint8_t> queue_;
   size_t srcIndex_, dstIndex_;
+  bool gpsSync_; /// Set when we want the timestamps synced to GPS time
 
   std::function<void(const Imu::IMUData &)>
   imuDataCallback_; /// Called with IMU data is ready

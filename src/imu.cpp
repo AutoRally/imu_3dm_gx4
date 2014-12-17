@@ -75,6 +75,7 @@ extern "C" {
 #define FIELD_MAGNETOMETER      u8(0x06)
 #define FIELD_ANGLE_UNCERTAINTY u8(0x0A)
 #define FIELD_BIAS_UNCERTAINTY  u8(0x0B)
+#define FIELD_GPS_TIMESTAMP     u8(0x12)
 #define FIELD_BAROMETER         u8(0x17)
 #define FIELD_DEVICE_INFO       u8(0x81)
 #define FIELD_IMU_BASERATE      u8(0x83)
@@ -737,6 +738,11 @@ void Imu::setIMUDataRate(uint16_t decimation,
     encoder.append(field, decimation);
   }
   
+  // Check if we want GPS Syncronization
+  if (gpsSync_) {
+    encoder.append(FIELD_GPS_TIMESTAMP, decimation);
+  }
+
   encoder.endField();
   p.calcChecksum();
   sendCommand(p);
@@ -765,6 +771,12 @@ void Imu::setFilterDataRate(uint16_t decimation, const std::bitset<4>& sources) 
   for (const uint8_t& field : fields) {
     encoder.append(field, decimation);
   }
+
+  // Check if we want GPS Syncronization
+  if (gpsSync_) {
+    encoder.append(FIELD_GPS_TIMESTAMP, decimation);
+  }
+
   encoder.endField();
   p.calcChecksum();
   sendCommand(p);
@@ -852,6 +864,10 @@ void Imu::enableFilterStream(bool enabled) {
     assert(p.checkMSB == 0x06 && p.checkLSB == 0x1E);
   }
   sendCommand(p);
+}
+
+void Imu::enableGpsTimeSync(bool enabled) {
+  gpsSync_ = enabled;
 }
 
 void
@@ -997,6 +1013,15 @@ void Imu::processPacket() {
         decoder.extract(1, &data.pressure);
         data.fields |= IMUData::Barometer;
         break;
+      case FIELD_GPS_TIMESTAMP:
+        decoder.extract(1, &data.gpstow);
+        decoder.extract(1, &data.gpsweek);
+        uint16_t gpsFlags;
+        decoder.extract(1, &gpsFlags);
+        std::cout << "IMU gpsweek: " << data.gpsweek;
+        std::cout << " gpstow: " << data.gpstow;
+        std::cout << " gpsFlags: " << gpsFlags << std::endl;
+        break;
       default:
         std::stringstream ss;
         ss << "Unsupported field in IMU packet: " << std::hex << d;
@@ -1030,6 +1055,15 @@ void Imu::processPacket() {
         decoder.extract(3, &filterData.biasUncertainty[0]);
         decoder.extract(1, &filterData.biasUncertaintyStatus);
         filterData.fields |= FilterData::BiasUncertainty;
+        break;
+      case FIELD_GPS_TIMESTAMP:
+        decoder.extract(1, &data.gpstow);
+        decoder.extract(1, &data.gpsweek);
+        uint16_t gpsFlags;
+        decoder.extract(1, &gpsFlags);
+        std::cout << "Filter gpsweek: " << data.gpsweek;
+        std::cout << " gpstow: " << data.gpstow;
+        std::cout << " gpsFlags: " << gpsFlags << std::endl;
         break;
       default:
         std::stringstream ss;
