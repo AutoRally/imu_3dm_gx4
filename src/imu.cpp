@@ -732,7 +732,11 @@ void Imu::setIMUDataRate(uint16_t decimation,
     }
   }
   encoder.beginField(COMMAND_IMU_MESSAGE_FORMAT);
-  encoder.append(FUNCTION_APPLY, u8(fields.size()));
+  if (gpsSync_) {
+    encoder.append(FUNCTION_APPLY, u8(fields.size()+1));
+  } else {
+    encoder.append(FUNCTION_APPLY, u8(fields.size()));
+  }
   
   for (const uint8_t& field : fields) {
     encoder.append(field, decimation);
@@ -745,6 +749,7 @@ void Imu::setIMUDataRate(uint16_t decimation,
 
   encoder.endField();
   p.calcChecksum();
+  std::cout << "Sending Packet: " << p.toString() << std::endl;
   sendCommand(p);
 }
 
@@ -766,7 +771,11 @@ void Imu::setFilterDataRate(uint16_t decimation, const std::bitset<4>& sources) 
   }
   
   encoder.beginField(COMAMND_FILTER_MESSAGE_FORMAT);
-  encoder.append(FUNCTION_APPLY, u8(fields.size()));
+  if (gpsSync_) {
+    encoder.append(FUNCTION_APPLY, u8(fields.size()+1));
+  } else {
+    encoder.append(FUNCTION_APPLY, u8(fields.size()));
+  }
   
   for (const uint8_t& field : fields) {
     encoder.append(field, decimation);
