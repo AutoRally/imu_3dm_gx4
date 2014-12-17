@@ -68,20 +68,21 @@ extern "C" {
 #define COMMAND_DEVICE_STATUS         u8(0x64)
 
 //  supported fields
-#define FIELD_QUATERNION        u8(0x03)
-#define FIELD_ACCELEROMETER     u8(0x04)
-#define FIELD_GYROSCOPE         u8(0x05)
-#define FIELD_GYRO_BIAS         u8(0x06)
-#define FIELD_MAGNETOMETER      u8(0x06)
-#define FIELD_ANGLE_UNCERTAINTY u8(0x0A)
-#define FIELD_BIAS_UNCERTAINTY  u8(0x0B)
-#define FIELD_GPS_TIMESTAMP     u8(0x12)
-#define FIELD_BAROMETER         u8(0x17)
-#define FIELD_DEVICE_INFO       u8(0x81)
-#define FIELD_IMU_BASERATE      u8(0x83)
-#define FIELD_FILTER_BASERATE   u8(0x8A)
-#define FIELD_STATUS_REPORT     u8(0x90)
-#define FIELD_ACK_OR_NACK       u8(0xF1)
+#define FIELD_QUATERNION                u8(0x03)
+#define FIELD_ACCELEROMETER             u8(0x04)
+#define FIELD_GYROSCOPE                 u8(0x05)
+#define FIELD_GYRO_BIAS                 u8(0x06)
+#define FIELD_MAGNETOMETER              u8(0x06)
+#define FIELD_ANGLE_UNCERTAINTY         u8(0x0A)
+#define FIELD_BIAS_UNCERTAINTY          u8(0x0B)
+#define FIELD_GPS_CORRELATION_TIMESTAMP u8(0x12)
+#define FIELD_GPS_TIMESTAMP             u8(0x11)
+#define FIELD_BAROMETER                 u8(0x17)
+#define FIELD_DEVICE_INFO               u8(0x81)
+#define FIELD_IMU_BASERATE              u8(0x83)
+#define FIELD_FILTER_BASERATE           u8(0x8A)
+#define FIELD_STATUS_REPORT             u8(0x90)
+#define FIELD_ACK_OR_NACK               u8(0xF1)
 
 using namespace imu_3dm_gx4;
 
@@ -722,7 +723,8 @@ void Imu::setIMUDataRate(uint16_t decimation,
   static const uint8_t fieldDescs[] = { FIELD_ACCELEROMETER, 
                                         FIELD_GYROSCOPE, 
                                         FIELD_MAGNETOMETER, 
-                                        FIELD_BAROMETER };
+                                        FIELD_BAROMETER,
+                                        FIELD_GPS_CORRELATION_TIMESTAMP};
   assert(sizeof(fieldDescs) == sources.size());
   std::vector<uint8_t> fields;
   
@@ -732,19 +734,10 @@ void Imu::setIMUDataRate(uint16_t decimation,
     }
   }
   encoder.beginField(COMMAND_IMU_MESSAGE_FORMAT);
-  if (gpsSync_) {
-    encoder.append(FUNCTION_APPLY, u8(fields.size()+1));
-  } else {
-    encoder.append(FUNCTION_APPLY, u8(fields.size()));
-  }
+  encoder.append(FUNCTION_APPLY, u8(fields.size()));
   
   for (const uint8_t& field : fields) {
     encoder.append(field, decimation);
-  }
-  
-  // Check if we want GPS Syncronization
-  if (gpsSync_) {
-    encoder.append(FIELD_GPS_TIMESTAMP, decimation);
   }
 
   encoder.endField();
@@ -760,7 +753,8 @@ void Imu::setFilterDataRate(uint16_t decimation, const std::bitset<4>& sources) 
   static const uint8_t fieldDescs[] = { FIELD_QUATERNION,
                                         FIELD_GYRO_BIAS,
                                         FIELD_ANGLE_UNCERTAINTY,
-                                        FIELD_BIAS_UNCERTAINTY };
+                                        FIELD_BIAS_UNCERTAINTY,
+                                        FIELD_GPS_TIMESTAMP};
   assert(sizeof(fieldDescs) == sources.size());
   std::vector<uint8_t> fields;
   
@@ -771,19 +765,10 @@ void Imu::setFilterDataRate(uint16_t decimation, const std::bitset<4>& sources) 
   }
   
   encoder.beginField(COMAMND_FILTER_MESSAGE_FORMAT);
-  if (gpsSync_) {
-    encoder.append(FUNCTION_APPLY, u8(fields.size()+1));
-  } else {
-    encoder.append(FUNCTION_APPLY, u8(fields.size()));
-  }
+  encoder.append(FUNCTION_APPLY, u8(fields.size()));
   
   for (const uint8_t& field : fields) {
     encoder.append(field, decimation);
-  }
-
-  // Check if we want GPS Syncronization
-  if (gpsSync_) {
-    encoder.append(FIELD_GPS_TIMESTAMP, decimation);
   }
 
   encoder.endField();
@@ -1022,14 +1007,13 @@ void Imu::processPacket() {
         decoder.extract(1, &data.pressure);
         data.fields |= IMUData::Barometer;
         break;
-      case FIELD_GPS_TIMESTAMP:
-        decoder.extract(1, &data.gpstow);
-        decoder.extract(1, &data.gpsweek);
-        uint16_t gpsFlags;
-        decoder.extract(1, &gpsFlags);
-        std::cout << "IMU gpsweek: " << data.gpsweek;
-        std::cout << " gpstow: " << data.gpstow;
-        std::cout << " gpsFlags: " << gpsFlags << std::endl;
+      case FIELD_GPS_CORRELATION_TIMESTAMP:
+        decoder.extract(1, &data.gpsTow);
+        decoder.extract(1, &data.gpsWeek);
+        decoder.extract(1, &data.gpsTimeStatus);
+        std::cout << "IMU gpsweek: " << data.gpsWeek;
+        std::cout << " gpstow: " << data.gpsTow;
+        std::cout << " gpsFlags: " << data.gpsTimeStatus << std::endl;
         break;
       default:
         std::stringstream ss;
@@ -1066,13 +1050,12 @@ void Imu::processPacket() {
         filterData.fields |= FilterData::BiasUncertainty;
         break;
       case FIELD_GPS_TIMESTAMP:
-        decoder.extract(1, &data.gpstow);
-        decoder.extract(1, &data.gpsweek);
-        uint16_t gpsFlags;
-        decoder.extract(1, &gpsFlags);
-        std::cout << "Filter gpsweek: " << data.gpsweek;
-        std::cout << " gpstow: " << data.gpstow;
-        std::cout << " gpsFlags: " << gpsFlags << std::endl;
+        decoder.extract(1, &filterData.gpsTow);
+        decoder.extract(1, &filterData.gpsWeek);
+        decoder.extract(1, &filterData.gpsTimeStatus);
+        std::cout << "Filter gpsweek: " << filterData.gpsWeek;
+        std::cout << " gpstow: " << filterData.gpsTow;
+        std::cout << " gpsFlags: " << filterData.gpsTimeStatus << std::endl;
         break;
       default:
         std::stringstream ss;

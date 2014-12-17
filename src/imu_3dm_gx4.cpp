@@ -232,13 +232,15 @@ int main(int argc, char **argv) {
         imuDecimation, Imu::IMUData::Accelerometer | 
           Imu::IMUData::Gyroscope |
           Imu::IMUData::Magnetometer |
-          Imu::IMUData::Barometer);
+          Imu::IMUData::Barometer |
+          Imu::IMUData::GpsTime);
 
     ROS_INFO("Selecting filter decimation: %u", filterDecimation);
     imu.setFilterDataRate(filterDecimation, Imu::FilterData::Quaternion |
                           Imu::FilterData::Bias |
                           Imu::FilterData::AngleUnertainty |
-                          Imu::FilterData::BiasUncertainty);
+                          Imu::FilterData::BiasUncertainty |
+                          Imu::FilterData::GpsTime);
 
     ROS_INFO("Enabling IMU data stream");
     imu.enableIMUStream(true);

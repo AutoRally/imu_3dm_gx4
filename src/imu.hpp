@@ -173,8 +173,9 @@ public:
     float gyro[3];  /**< Angular rates, units of rad/s */
     float mag[3];   /**< Magnetic field, units of gauss */
     float pressure; /**< Pressure, units of gauss */
-    double gpstow;
-    uint16_t gpsweek;
+    double gpsTow;
+    uint16_t gpsWeek;
+    uint16_t gpsTimeStatus;
 
     IMUData() : fields(0) {}
   };
@@ -188,6 +189,7 @@ public:
       Bias = (1 << 1),
       AngleUnertainty = (1 << 2),
       BiasUncertainty = (1 << 3),
+      GpsTime = (1 << 4),
     };
 
     unsigned int fields; /**< Which fields are present in the struct. */
@@ -203,6 +205,10 @@ public:
 
     float biasUncertainty[3];       /**< 1-sigma bias uncertainty */
     uint16_t biasUncertaintyStatus; /**< 0 = invalid, 1 = valid */
+
+    double gpsTow;
+    uint16_t gpsWeek;
+    uint16_t gpsTimeStatus;
 
     FilterData() : fields(0) {}
   };
