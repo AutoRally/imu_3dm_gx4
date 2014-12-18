@@ -746,7 +746,6 @@ void Imu::setIMUDataRate(uint16_t decimation,
 
   encoder.endField();
   p.calcChecksum();
-  std::cout << "Sending Packet: " << p.toString() << std::endl;
   sendCommand(p);
 }
 
@@ -1018,6 +1017,7 @@ void Imu::processPacket() {
         std::cout << "IMU gpsweek: " << data.gpsWeek;
         std::cout << " gpstow: " << data.gpsTow;
         std::cout << " gpsFlags: " << data.gpsTimeStatus << std::endl;
+        data.fields |= IMUData::GpsTime;
         break;
       default:
         std::stringstream ss;
@@ -1060,6 +1060,7 @@ void Imu::processPacket() {
         std::cout << "Filter gpsweek: " << filterData.gpsWeek;
         std::cout << " gpstow: " << filterData.gpsTow;
         std::cout << " gpsFlags: " << filterData.gpsTimeStatus << std::endl;
+        data.fields |= FilterData::GpsTime;
         break;
       default:
         std::stringstream ss;
@@ -1183,7 +1184,6 @@ void Imu::sendGpsTimeUpdate(uint16_t week, uint16_t second) {
   encoder.append(FUNCTION_APPLY, SELECTOR_GPS_SECONDS, u32(second));
   encoder.endField();
   p.calcChecksum();
-  std::cout << p.toString() << std::endl;
   sendPacket(p, rwTimeout_);
 }
 

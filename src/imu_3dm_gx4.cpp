@@ -54,13 +54,14 @@ void publishData(const Imu::IMUData &data) {
     ros::Time currentTime = ros::Time::now();
     // Do we need to send a new time?
     // Don't send it right at the rollover in case CPU time is a bit off
-    if ((lastTimePublished < currentTime) & (currentTime.nsec > 100000000) ) {
+    if ((lastTimePublished.sec < currentTime.sec)
+         & (currentTime.nsec > 100000000)) {
       uint16_t gpsWeek = currentTime.sec / secondsPerWeek;
       uint16_t gpsSecond = currentTime.sec % secondsPerWeek;
       imuInstance->sendGpsTimeUpdate(gpsWeek, gpsSecond);
       lastTimePublished = currentTime;
+      std::cout << "Sent a time update" << std::endl;
     }
-    std::cout << "Send a time update" << std::endl;
   }
   
   if (gpsTimeMode) {
@@ -69,6 +70,9 @@ void publishData(const Imu::IMUData &data) {
     double fpart = modf(data.gpsTow, &ipart);
     timeStamp.sec = (uint32_t)ipart + ((uint32_t)data.gpsWeek * secondsPerWeek);
     timeStamp.nsec = (uint32_t)(fpart * 1000000000);
+    imu.header.stamp = timeStamp;
+    std::cout << "Timestamp " << timeStamp;
+    std::cout << " currently " << ros::Time::now() << std::endl;
   } else {
     imu.header.stamp = ros::Time::now();
   }
