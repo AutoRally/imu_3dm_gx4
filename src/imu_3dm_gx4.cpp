@@ -15,12 +15,15 @@
 using namespace imu_3dm_gx4;
 
 #define kEarthGravity (9.80665)
+#define secondsPerWeek 604800
 
 ros::Publisher pubIMU;
 ros::Publisher pubMag;
 ros::Publisher pubPressure;
 ros::Publisher pubFilter;
 std::string frameId;
+ros::Time lastTimePublished;
+Imu *imuInstance;
 
 Imu::Info info;
 Imu::DiagnosticFields fields;
@@ -42,14 +45,34 @@ void publishData(const Imu::IMUData &data) {
   assert(data.fields & Imu::IMUData::Barometer);
   assert(data.fields & Imu::IMUData::Gyroscope);
 
+  // Assume if we are getting GpsTime fields from the imu, we should send time updates
   bool gpsTimeMode = data.fields & Imu::IMUData::GpsTime;
 
+  // If we are syncing to gps time, check if we need to send a time update
+  // This assumes the system time is synced to GPS...
   if (gpsTimeMode) {
-    
+    ros::Time currentTime = ros::Time::now();
+    // Do we need to send a new time?
+    // Don't send it right at the rollover in case CPU time is a bit off
+    if ((lastTimePublished < currentTime) & (currentTime.nsec > 100000000) ) {
+      uint16_t gpsWeek = currentTime.sec / secondsPerWeek;
+      uint16_t gpsSecond = currentTime.sec % secondsPerWeek;
+      imuInstance->sendGpsTimeUpdate(gpsWeek, gpsSecond);
+      lastTimePublished = currentTime;
+    }
+    std::cout << "Send a time update" << std::endl;
   }
   
+  if (gpsTimeMode) {
+    ros::Time timeStamp;
+    double ipart;
+    double fpart = modf(data.gpsTow, &ipart);
+    timeStamp.sec = (uint32_t)ipart + ((uint32_t)data.gpsWeek * secondsPerWeek);
+    timeStamp.nsec = (uint32_t)(fpart * 1000000000);
+  } else {
+    imu.header.stamp = ros::Time::now();
+  }
   //  timestamp identically
-  imu.header.stamp = ros::Time::now();
   imu.header.frame_id = frameId;
   field.header.stamp = imu.header.stamp;
   field.header.frame_id = frameId;
@@ -195,6 +218,7 @@ int main(int argc, char **argv) {
 
   //  new instance of the IMU
   Imu imu(device);
+  imuInstance = &imu;
   try {
     imu.connect();
 

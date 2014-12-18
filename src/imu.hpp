@@ -404,8 +404,16 @@ public:
    * @brief Set the onboard filter data callback.
    * @note The filter data is called every time new orientation data is read.
    */
-  void
-  setFilterDataCallback(const std::function<void(const Imu::FilterData &)> &);
+  void setFilterDataCallback(const std::function<void(const Imu::FilterData &)> &);
+
+  /**
+     * @brief Send a time update to the IMU.
+     * @note This should be called once per seond with the current GPS time.
+     * @param week Gps week
+     * @param second Current Gps second of week
+     */
+  void sendGpsTimeUpdate(uint16_t week, uint16_t second);
+
 
 private:
   //  non-copyable

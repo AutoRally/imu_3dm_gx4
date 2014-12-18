@@ -35,6 +35,7 @@ extern "C" {
 #define kBufferSize        (10) //  keep this small, or 1000Hz is not attainable
 
 #define u8(x) static_cast<uint8_t>((x))
+#define u32(x) static_cast<uint32_t>((x))
 
 #define COMMAND_CLASS_BASE    u8(0x01)
 #define COMMAND_CLASS_3DM     u8(0x0C)
@@ -47,11 +48,14 @@ extern "C" {
 
 #define SELECTOR_IMU          u8(0x01)
 #define SELECTOR_FILTER       u8(0x03)
+#define SELECTOR_GPS_WEEK     u8(0x01)
+#define SELECTOR_GPS_SECONDS  u8(0x02)
 
 //  base commands
-#define DEVICE_PING           u8(0x01)
-#define DEVICE_IDLE           u8(0x02)
-#define DEVICE_RESUME         u8(0x06) 
+#define DEVICE_PING            u8(0x01)
+#define DEVICE_IDLE            u8(0x02)
+#define DEVICE_RESUME          u8(0x06)
+#define DEVICE_GPS_TIME_UPDATE u8(0x72)
 
 //  3DM and FILTER commands
 #define COMMAND_GET_DEVICE_INFO       u8(0x03)
@@ -1167,3 +1171,19 @@ void Imu::sendCommand(const Packet &p) {
   sendPacket(p, rwTimeout_);
   receiveResponse(p, rwTimeout_);
 }
+
+void Imu::sendGpsTimeUpdate(uint16_t week, uint16_t second) {
+  Imu::Packet p(COMMAND_CLASS_BASE);  //  was 0x02
+  PacketEncoder encoder(p);
+  encoder.beginField(DEVICE_GPS_TIME_UPDATE);
+  encoder.append(FUNCTION_APPLY, SELECTOR_GPS_WEEK, u32(week));
+  encoder.endField();
+
+  encoder.beginField(DEVICE_GPS_TIME_UPDATE);
+  encoder.append(FUNCTION_APPLY, SELECTOR_GPS_SECONDS, u32(second));
+  encoder.endField();
+  p.calcChecksum();
+  std::cout << p.toString() << std::endl;
+  sendPacket(p, rwTimeout_);
+}
+
