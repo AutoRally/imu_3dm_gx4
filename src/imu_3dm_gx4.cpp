@@ -41,6 +41,12 @@ void publishData(const Imu::IMUData &data) {
   assert(data.fields & Imu::IMUData::Magnetometer);
   assert(data.fields & Imu::IMUData::Barometer);
   assert(data.fields & Imu::IMUData::Gyroscope);
+
+  bool gpsTimeMode = data.fields & Imu::IMUData::GpsTime;
+
+  if (gpsTimeMode) {
+    
+  }
   
   //  timestamp identically
   imu.header.stamp = ros::Time::now();
@@ -233,14 +239,14 @@ int main(int argc, char **argv) {
           Imu::IMUData::Gyroscope |
           Imu::IMUData::Magnetometer |
           Imu::IMUData::Barometer |
-          Imu::IMUData::GpsTime);
+          (enableGpsTimeSync ? Imu::IMUData::GpsTime : 0));
 
     ROS_INFO("Selecting filter decimation: %u", filterDecimation);
     imu.setFilterDataRate(filterDecimation, Imu::FilterData::Quaternion |
                           Imu::FilterData::Bias |
                           Imu::FilterData::AngleUnertainty |
                           Imu::FilterData::BiasUncertainty |
-                          Imu::FilterData::GpsTime);
+                          (enableGpsTimeSync ? Imu::IMUData::GpsTime : 0));
 
     ROS_INFO("Enabling IMU data stream");
     imu.enableIMUStream(true);

@@ -715,7 +715,7 @@ void Imu::getDiagnosticInfo(Imu::DiagnosticFields &fields) {
 }
 
 void Imu::setIMUDataRate(uint16_t decimation, 
-                        const std::bitset<4>& sources) {
+                        const std::bitset<5>& sources) {
   Imu::Packet p(COMMAND_CLASS_3DM);  //  was 0x04
   PacketEncoder encoder(p);
   
@@ -746,7 +746,7 @@ void Imu::setIMUDataRate(uint16_t decimation,
   sendCommand(p);
 }
 
-void Imu::setFilterDataRate(uint16_t decimation, const std::bitset<4>& sources) {
+void Imu::setFilterDataRate(uint16_t decimation, const std::bitset<5>& sources) {
   Imu::Packet p(COMMAND_CLASS_3DM);  //  was 0x04
   PacketEncoder encoder(p);
  

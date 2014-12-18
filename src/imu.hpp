@@ -336,17 +336,17 @@ public:
    *
    * @throw invalid_argument if an invalid source is requested.
    */
-  void setIMUDataRate(uint16_t decimation, const std::bitset<4> &sources);
+  void setIMUDataRate(uint16_t decimation, const std::bitset<5> &sources);
 
   /**
    * @brief setFilterDataRate Set estimator data rate for different sources.
    * @param decimation Denominator in the update rate value: 500/x
    * @param sources Sources to apply this rate to. May be a bitwise combination
-   * of the values: Quaternion, GyroBias, AngleUncertainty, BiasUncertainty
+   * of the values: Quaternion, GyroBias, AngleUncertainty, BiasUncertainty.
    *
    * @throw invalid_argument if an invalid source is requested.
    */
-  void setFilterDataRate(uint16_t decimation, const std::bitset<4> &sources);
+  void setFilterDataRate(uint16_t decimation, const std::bitset<5> &sources);
 
   /**
    * @brief enableMeasurements Set which measurements to enable in the filter
