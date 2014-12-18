@@ -1014,9 +1014,9 @@ void Imu::processPacket() {
         decoder.extract(1, &data.gpsTow);
         decoder.extract(1, &data.gpsWeek);
         decoder.extract(1, &data.gpsTimeStatus);
-        std::cout << "IMU gpsweek: " << data.gpsWeek;
-        std::cout << " gpstow: " << data.gpsTow;
-        std::cout << " gpsFlags: " << data.gpsTimeStatus << std::endl;
+        //std::cout << "IMU gpsweek: " << data.gpsWeek;
+        //std::cout << " gpstow: " << data.gpsTow;
+        //std::cout << " gpsFlags: " << data.gpsTimeStatus << std::endl;
         data.fields |= IMUData::GpsTime;
         break;
       default:
@@ -1057,9 +1057,9 @@ void Imu::processPacket() {
         decoder.extract(1, &filterData.gpsTow);
         decoder.extract(1, &filterData.gpsWeek);
         decoder.extract(1, &filterData.gpsTimeStatus);
-        std::cout << "Filter gpsweek: " << filterData.gpsWeek;
-        std::cout << " gpstow: " << filterData.gpsTow;
-        std::cout << " gpsFlags: " << filterData.gpsTimeStatus << std::endl;
+        //std::cout << "Filter gpsweek: " << filterData.gpsWeek;
+        //std::cout << " gpstow: " << filterData.gpsTow;
+        //std::cout << " gpsFlags: " << filterData.gpsTimeStatus << std::endl;
         data.fields |= FilterData::GpsTime;
         break;
       default:
@@ -1173,7 +1173,7 @@ void Imu::sendCommand(const Packet &p) {
   receiveResponse(p, rwTimeout_);
 }
 
-void Imu::sendGpsTimeUpdate(uint16_t week, uint16_t second) {
+void Imu::sendGpsTimeUpdate(uint32_t week, uint32_t second) {
   Imu::Packet p(COMMAND_CLASS_BASE);  //  was 0x02
   PacketEncoder encoder(p);
   encoder.beginField(DEVICE_GPS_TIME_UPDATE);

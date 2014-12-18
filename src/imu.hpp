@@ -412,7 +412,7 @@ public:
      * @param week Gps week
      * @param second Current Gps second of week
      */
-  void sendGpsTimeUpdate(uint16_t week, uint16_t second);
+  void sendGpsTimeUpdate(uint32_t week, uint32_t second);
 
 
 private:
