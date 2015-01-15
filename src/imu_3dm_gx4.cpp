@@ -28,6 +28,8 @@ Imu *imuInstance;
 Imu::Info info;
 Imu::DiagnosticFields fields;
 
+int gpsTimeFudge;   // Fudge factor if the imu time is off by a second...
+
 //  diagnostic_updater resources
 std::shared_ptr<diagnostic_updater::Updater> updater;
 std::shared_ptr<diagnostic_updater::TopicDiagnostic> imuDiag;
@@ -52,8 +54,6 @@ void publishData(const Imu::IMUData &data) {
   // This assumes the system time is synced to GPS...
   if (gpsTimeMode) {
     ros::Time currentTime = ros::Time::now();
-    
-    
     ros::Time timeStamp;
     double ipart;
     double fpart = modf(data.gpsTow, &ipart);
@@ -63,7 +63,9 @@ void publishData(const Imu::IMUData &data) {
     // Do we need to send a new time?
     // Don't send it right at the rollover in case CPU time is a bit off
     if ((lastTimePublished.sec < currentTime.sec)
-         & (currentTime.nsec > 100000000)) {
+         && (currentTime.nsec > 100000000)) {
+      // If we need to fudge the time, do it here.
+      currentTime.sec += gpsTimeFudge;
       uint32_t gpsWeek = currentTime.sec / secondsPerWeek;
       uint32_t gpsSecond = currentTime.sec % secondsPerWeek;
       imuInstance->sendGpsTimeUpdate(gpsWeek, gpsSecond);
@@ -111,9 +113,25 @@ void publishFilter(const Imu::FilterData &data) {
   assert(data.fields & Imu::FilterData::Bias);
   assert(data.fields & Imu::FilterData::AngleUnertainty);
   assert(data.fields & Imu::FilterData::BiasUncertainty);
+
+  // Assume if we are getting GpsTime fields from the imu, we should use them
+  bool gpsTimeMode = data.fields & Imu::FilterData::GpsTime;
   
+  std::cout << "Data Fields: " << data.fields << " Looking for " << Imu::FilterData::GpsTime << std::endl;
+
   imu_3dm_gx4::FilterOutput output;
+  if (gpsTimeMode) {
+    ros::Time currentTime = ros::Time::now();
+    ros::Time timeStamp;
+    double ipart;
+    double fpart = modf(data.gpsTow, &ipart);
+    timeStamp.sec = (uint32_t)ipart + ((uint32_t)data.gpsWeek * (uint32_t)secondsPerWeek);
+    timeStamp.nsec = (uint32_t)(fpart * 1000000000);
+    output.header.stamp = timeStamp;
+  } else {
   output.header.stamp = ros::Time::now();
+  }
+  
   output.header.frame_id = frameId;
   output.orientation.w = data.quaternion[0];
   output.orientation.x = data.quaternion[1];
@@ -204,6 +222,7 @@ int main(int argc, char **argv) {
   nh.param<bool>("enable_mag_update", enableMagUpdate, false);
   nh.param<bool>("enable_accel_update", enableAccelUpdate, true);
   nh.param<bool>("enable_gps_time_sync", enableGpsTimeSync, false);
+  nh.param<int>("gps_time_fudge_factor", gpsTimeFudge, 0);
 
   if (requestedFilterRate < 0 || requestedImuRate < 0) {
     ROS_ERROR("imu_rate and filter_rate must be > 0");
@@ -272,7 +291,7 @@ int main(int argc, char **argv) {
                           Imu::FilterData::Bias |
                           Imu::FilterData::AngleUnertainty |
                           Imu::FilterData::BiasUncertainty |
-                          (enableGpsTimeSync ? Imu::IMUData::GpsTime : 0));
+                          (enableGpsTimeSync ? Imu::FilterData::GpsTime : 0));
 
     ROS_INFO("Enabling IMU data stream");
     imu.enableIMUStream(true);
