@@ -70,8 +70,8 @@ void publishData(const Imu::IMUData &data) {
       uint32_t gpsSecond = currentTime.sec % secondsPerWeek;
       imuInstance->sendGpsTimeUpdate(gpsWeek, gpsSecond);
       lastTimePublished = currentTime;
-      std::cout << "Timestamp " << timeStamp;
-      std::cout << " currently " << ros::Time::now() << std::endl;
+      //std::cout << "Timestamp " << timeStamp;
+      //std::cout << " currently " << ros::Time::now() << std::endl;
     }
   } else {
     imu.header.stamp = ros::Time::now();
@@ -117,7 +117,7 @@ void publishFilter(const Imu::FilterData &data) {
   // Assume if we are getting GpsTime fields from the imu, we should use them
   bool gpsTimeMode = data.fields & Imu::FilterData::GpsTime;
   
-  std::cout << "Data Fields: " << data.fields << " Looking for " << Imu::FilterData::GpsTime << std::endl;
+  //std::cout << "Data Fields: " << data.fields << " Looking for " << Imu::FilterData::GpsTime << std::endl;
 
   imu_3dm_gx4::FilterOutput output;
   if (gpsTimeMode) {

@@ -1060,7 +1060,7 @@ void Imu::processPacket() {
         //std::cout << "Filter gpsweek: " << filterData.gpsWeek;
         //std::cout << " gpstow: " << filterData.gpsTow;
         //std::cout << " gpsFlags: " << filterData.gpsTimeStatus << std::endl;
-        data.fields |= FilterData::GpsTime;
+        filterData.fields |= FilterData::GpsTime;
         break;
       default:
         std::stringstream ss;
