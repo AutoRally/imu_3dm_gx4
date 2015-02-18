@@ -52,20 +52,23 @@ void publishData(const Imu::IMUData &data) {
   // This assumes the system time is synced to GPS...
   if (gpsTimeMode) {
     ros::Time currentTime = ros::Time::now();
-    
-    
     ros::Time timeStamp;
     double ipart;
     double fpart = modf(data.gpsTow, &ipart);
     timeStamp.sec = (uint32_t)ipart + ((uint32_t)data.gpsWeek * (uint32_t)secondsPerWeek);
     timeStamp.nsec = (uint32_t)(fpart * 1000000000);
     imu.header.stamp = timeStamp;
+    std::cout << data.gpsTow << " " << data.gpsTimeStatus << std::endl;
     // Do we need to send a new time?
     // Don't send it right at the rollover in case CPU time is a bit off
+    // And don't send it too late.
     if ((lastTimePublished.sec < currentTime.sec)
-         & (currentTime.nsec > 100000000)) {
-      uint32_t gpsWeek = currentTime.sec / secondsPerWeek;
-      uint32_t gpsSecond = currentTime.sec % secondsPerWeek;
+         && (currentTime.nsec > 600000000) && (currentTime.nsec < 800000000)) {
+      // Not properly GPS time (including leap years, leap seconds, etc)
+      // But we convert it back using the same formula so it doesn't matter.
+      // We need to tell it the time of the next
+      uint32_t gpsWeek = (currentTime.sec+1) / secondsPerWeek;
+      uint32_t gpsSecond = (currentTime.sec+1) % secondsPerWeek;
       imuInstance->sendGpsTimeUpdate(gpsWeek, gpsSecond);
       lastTimePublished = currentTime;
       std::cout << "Timestamp " << timeStamp;
