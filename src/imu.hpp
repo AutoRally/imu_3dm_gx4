@@ -444,7 +444,8 @@ private:
   std::deque<uint8_t> queue_;
   size_t srcIndex_, dstIndex_;
   bool gpsSync_; /// Set when we want the timestamps synced to GPS time
-
+  bool ppsBeaconGood, gpsTimeInitialized;
+  uint32_t gpsTimeRefreshes, previousTimeRefresh;
   std::function<void(const Imu::IMUData &)>
   imuDataCallback_; /// Called with IMU data is ready
   std::function<void(const Imu::FilterData &)>

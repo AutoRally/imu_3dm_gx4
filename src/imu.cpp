@@ -397,7 +397,7 @@ std::string Imu::timeout_error::generateString(bool write,
 }
 
 Imu::Imu(const std::string &device) : device_(device), fd_(0), 
-  rwTimeout_(kDefaultTimeout), state_(Idle) {
+  rwTimeout_(kDefaultTimeout), gpsTimeRefreshes(0), state_(Idle){
   //  buffer for storing reads
   buffer_.resize(kBufferSize);
 }
@@ -1014,9 +1014,6 @@ void Imu::processPacket() {
         decoder.extract(1, &data.gpsTow);
         decoder.extract(1, &data.gpsWeek);
         decoder.extract(1, &data.gpsTimeStatus);
-        //std::cout << "IMU gpsweek: " << data.gpsWeek;
-        //std::cout << " gpstow: " << data.gpsTow;
-        //std::cout << " gpsFlags: " << data.gpsTimeStatus << std::endl;
         data.fields |= IMUData::GpsTime;
         break;
       default:
@@ -1057,6 +1054,12 @@ void Imu::processPacket() {
         decoder.extract(1, &filterData.gpsTow);
         decoder.extract(1, &filterData.gpsWeek);
         decoder.extract(1, &filterData.gpsTimeStatus);
+        ppsBeaconGood = filterData.gpsTimeStatus & 0x01;
+        gpsTimeInitialized = filterData.gpsTimeStatus & 0x04;
+        if ((filterData.gpsTimeStatus & 0x02) != previousTimeRefresh) {
+          gpsTimeRefreshes ++;
+          previousTimeRefresh = filterData.gpsTimeStatus & 0x02;
+        }
         //std::cout << "Filter gpsweek: " << filterData.gpsWeek;
         //std::cout << " gpstow: " << filterData.gpsTow;
         //std::cout << " gpsFlags: " << filterData.gpsTimeStatus << std::endl;
