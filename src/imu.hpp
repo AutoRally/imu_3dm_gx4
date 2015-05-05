@@ -130,8 +130,7 @@ public:
     uint8_t selector;
     uint32_t statusFlags;
     uint32_t systemTimer;
-    uint32_t num1PPSPulses;
-    uint32_t last1PPSPulse;
+    uint32_t numPPSPulses;
     uint8_t imuStreamEnabled;
     uint8_t filterStreamEnabled;
     uint32_t imuPacketsDropped;
@@ -147,6 +146,9 @@ public:
     uint32_t numIMUParseErrors;
     uint32_t totalIMUMessages;
     uint32_t lastIMUMessage;
+    uint16_t quatStatus;
+    uint8_t beaconGood;
+    uint8_t gpsTimeInit;
 
     /**
      * @brief Convert to map of human readable strings and integers.
@@ -446,6 +448,7 @@ private:
   bool gpsSync_; /// Set when we want the timestamps synced to GPS time
   bool ppsBeaconGood, gpsTimeInitialized;
   uint32_t gpsTimeRefreshes, previousTimeRefresh;
+  uint16_t quaternionStatus;
   std::function<void(const Imu::IMUData &)>
   imuDataCallback_; /// Called with IMU data is ready
   std::function<void(const Imu::FilterData &)>

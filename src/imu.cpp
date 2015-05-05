@@ -355,8 +355,10 @@ std::map <std::string, unsigned int> Imu::DiagnosticFields::toMap() const {
   map["Selector"] = selector;
   map["Status flags"] = statusFlags;
   map["System timer"] = systemTimer;
-  map["Num 1PPS Pulses"] = num1PPSPulses;
-  map["Last 1PPS Pulse"] = last1PPSPulse;
+  map["Gps Time initialized"] = gpsTimeInit;
+  map["Beacon Good"] = beaconGood;
+  map["Num 1PPS pulses"] = numPPSPulses;
+  map["Quaternion Status"] = quatStatus;
   map["Imu stream enabled"] = imuStreamEnabled;
   map["Filter stream enabled"] = filterStreamEnabled;
   map["Imu packets dropped"] = imuPacketsDropped;
@@ -716,6 +718,10 @@ void Imu::getDiagnosticInfo(Imu::DiagnosticFields &fields) {
     decoder.extract(2, &fields.imuStreamEnabled);
     decoder.extract(13, &fields.imuPacketsDropped);
   }
+  fields.gpsTimeInit = gpsTimeInitialized;
+  fields.numPPSPulses = gpsTimeRefreshes;
+  fields.quatStatus = quaternionStatus;
+  fields.beaconGood = ppsBeaconGood;
 }
 
 void Imu::setIMUDataRate(uint16_t decimation, 
@@ -1033,6 +1039,7 @@ void Imu::processPacket() {
       case FIELD_QUATERNION:
         decoder.extract(4, &filterData.quaternion[0]);
         decoder.extract(1, &filterData.quaternionStatus);
+        quaternionStatus = filterData.quaternionStatus;
         filterData.fields |= FilterData::Quaternion;
         break;
       case FIELD_GYRO_BIAS:
