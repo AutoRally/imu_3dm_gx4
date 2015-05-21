@@ -58,21 +58,22 @@ void publishData(const Imu::IMUData &data) {
     double ipart;
     double fpart = modf(data.gpsTow, &ipart);
     timeStamp.sec = (uint32_t)ipart + ((uint32_t)data.gpsWeek * (uint32_t)secondsPerWeek);
+    timeStamp.sec += gpsTimeFudge;
     timeStamp.nsec = (uint32_t)(fpart * 1000000000);
     imu.header.stamp = timeStamp;
-    std::cout << data.gpsTow << " " << data.gpsTimeStatus << std::endl;
+    // std::cout << data.gpsTow << " " << data.gpsTimeStatus << std::endl;
     // Do we need to send a new time?
     // Don't send it right at the rollover in case CPU time is a bit off
     // And don't send it too late.
     if ((lastTimePublished.sec < currentTime.sec)
          && (currentTime.nsec > 600000000) && (currentTime.nsec < 800000000)) {
       // If we need to fudge the time, do it here.
-      currentTime.sec += gpsTimeFudge;
+//      currentTime.sec += gpsTimeFudge;
       // Not properly GPS time (including leap years, leap seconds, etc)
       // But we convert it back using the same formula so it doesn't matter.
       // We need to tell it the time of the next
-      uint32_t gpsWeek = (currentTime.sec+1) / secondsPerWeek;
-      uint32_t gpsSecond = (currentTime.sec+1) % secondsPerWeek;
+      uint32_t gpsWeek = (currentTime.sec) / secondsPerWeek;
+      uint32_t gpsSecond = (currentTime.sec) % secondsPerWeek;
       imuInstance->sendGpsTimeUpdate(gpsWeek, gpsSecond);
       lastTimePublished = currentTime;
       //std::cout << "Timestamp " << timeStamp;
@@ -174,7 +175,9 @@ std::shared_ptr<diagnostic_updater::TopicDiagnostic> configTopicDiagnostic(
   const double period = 1.0 / *target;  //  for 1000Hz, period is 1e-3
   
   diagnostic_updater::FrequencyStatusParam freqParam(target, target, 0.01, 10);
-  diagnostic_updater::TimeStampStatusParam timeParam(0, period * 0.5);
+  // diagnostic_updater::TimeStampStatusParam timeParam(0, period * 0.5);
+  diagnostic_updater::TimeStampStatusParam timeParam(0, 0.015);
+
   diag.reset(new diagnostic_updater::TopicDiagnostic(name, 
                                                      *updater, 
                                                      freqParam,
