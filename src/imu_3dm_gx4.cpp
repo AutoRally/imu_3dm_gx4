@@ -172,7 +172,7 @@ void publishFilter(const Imu::FilterData &data) {
 std::shared_ptr<diagnostic_updater::TopicDiagnostic> configTopicDiagnostic(
     const std::string& name, double * target) {
   std::shared_ptr<diagnostic_updater::TopicDiagnostic> diag;
-  const double period = 1.0 / *target;  //  for 1000Hz, period is 1e-3
+  // const double period = 1.0 / *target;  //  for 1000Hz, period is 1e-3
   
   diagnostic_updater::FrequencyStatusParam freqParam(target, target, 0.01, 10);
   // diagnostic_updater::TimeStampStatusParam timeParam(0, period * 0.5);
