@@ -219,6 +219,7 @@ int main(int argc, char **argv) {
   bool enableMagUpdate, enableAccelUpdate;
   bool enableGpsTimeSync;
   int requestedImuRate, requestedFilterRate;
+  bool verbose;
   
   //  load parameters from launch file
   nh.param<std::string>("device", device, "/dev/ttyACM0");
@@ -231,7 +232,8 @@ int main(int argc, char **argv) {
   nh.param<bool>("enable_accel_update", enableAccelUpdate, true);
   nh.param<bool>("enable_gps_time_sync", enableGpsTimeSync, false);
   nh.param<int>("gps_time_fudge_factor", gpsTimeFudge, 0);
-
+  nh.param<bool>("verbose", verbose, false);
+  
   if (requestedFilterRate < 0 || requestedImuRate < 0) {
     ROS_ERROR("imu_rate and filter_rate must be > 0");
     return -1;
@@ -246,7 +248,7 @@ int main(int argc, char **argv) {
   }
 
   //  new instance of the IMU
-  Imu imu(device);
+  Imu imu(device, verbose);
   imuInstance = &imu;
   try {
     imu.connect();
