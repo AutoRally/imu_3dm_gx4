@@ -130,8 +130,7 @@ public:
     uint8_t selector;
     uint32_t statusFlags;
     uint32_t systemTimer;
-    uint32_t num1PPSPulses;
-    uint32_t last1PPSPulse;
+    uint32_t numPPSPulses;
     uint8_t imuStreamEnabled;
     uint8_t filterStreamEnabled;
     uint32_t imuPacketsDropped;
@@ -147,6 +146,9 @@ public:
     uint32_t numIMUParseErrors;
     uint32_t totalIMUMessages;
     uint32_t lastIMUMessage;
+    uint16_t quatStatus;
+    uint8_t beaconGood;
+    uint8_t gpsTimeInit;
 
     /**
      * @brief Convert to map of human readable strings and integers.
@@ -164,6 +166,7 @@ public:
       Gyroscope = (1 << 1),
       Magnetometer = (1 << 2),
       Barometer = (1 << 3),
+      GpsTime = (1 << 4),
     };
 
     unsigned int fields; /**< Which fields are valid in the struct */
@@ -172,6 +175,9 @@ public:
     float gyro[3];  /**< Angular rates, units of rad/s */
     float mag[3];   /**< Magnetic field, units of gauss */
     float pressure; /**< Pressure, units of gauss */
+    double gpsTow;
+    uint16_t gpsWeek;
+    uint16_t gpsTimeStatus;
 
     IMUData() : fields(0) {}
   };
@@ -185,6 +191,7 @@ public:
       Bias = (1 << 1),
       AngleUnertainty = (1 << 2),
       BiasUncertainty = (1 << 3),
+      GpsTime = (1 << 4),
     };
 
     unsigned int fields; /**< Which fields are present in the struct. */
@@ -200,6 +207,10 @@ public:
 
     float biasUncertainty[3];       /**< 1-sigma bias uncertainty */
     uint16_t biasUncertaintyStatus; /**< 0 = invalid, 1 = valid */
+
+    double gpsTow;
+    uint16_t gpsWeek;
+    uint16_t gpsTimeStatus;
 
     FilterData() : fields(0) {}
   };
@@ -326,17 +337,17 @@ public:
    *
    * @throw invalid_argument if an invalid source is requested.
    */
-  void setIMUDataRate(uint16_t decimation, const std::bitset<4> &sources);
+  void setIMUDataRate(uint16_t decimation, const std::bitset<5> &sources);
 
   /**
    * @brief setFilterDataRate Set estimator data rate for different sources.
    * @param decimation Denominator in the update rate value: 500/x
    * @param sources Sources to apply this rate to. May be a bitwise combination
-   * of the values: Quaternion, GyroBias, AngleUncertainty, BiasUncertainty
+   * of the values: Quaternion, GyroBias, AngleUncertainty, BiasUncertainty.
    *
    * @throw invalid_argument if an invalid source is requested.
    */
-  void setFilterDataRate(uint16_t decimation, const std::bitset<4> &sources);
+  void setFilterDataRate(uint16_t decimation, const std::bitset<5> &sources);
 
   /**
    * @brief enableMeasurements Set which measurements to enable in the filter
@@ -378,6 +389,13 @@ public:
   void enableFilterStream(bool enabled);
 
   /**
+     * @brief enableGpsTimeSync Enable/disable GPS time syncronization.
+     * This requires system time syncronized to GPS time and PPS input to IMU
+     * @param enabled If true, enable GPS time sync.
+     */
+  void enableGpsTimeSync(bool enabled);
+
+  /**
    * @brief Set the IMU data callback.
    * @note The IMU data callback is called every time new IMU data is read.
    */
@@ -387,8 +405,16 @@ public:
    * @brief Set the onboard filter data callback.
    * @note The filter data is called every time new orientation data is read.
    */
-  void
-  setFilterDataCallback(const std::function<void(const Imu::FilterData &)> &);
+  void setFilterDataCallback(const std::function<void(const Imu::FilterData &)> &);
+
+  /**
+     * @brief Send a time update to the IMU.
+     * @note This should be called once per seond with the current GPS time.
+     * @param week Gps week
+     * @param second Current Gps second of week
+     */
+  void sendGpsTimeUpdate(uint32_t week, uint32_t second);
+
 
 private:
   //  non-copyable
@@ -421,7 +447,10 @@ private:
   std::vector<uint8_t> buffer_;
   std::deque<uint8_t> queue_;
   size_t srcIndex_, dstIndex_;
-
+  bool gpsSync_; /// Set when we want the timestamps synced to GPS time
+  bool ppsBeaconGood, gpsTimeInitialized;
+  uint32_t gpsTimeRefreshes, previousTimeRefresh;
+  uint16_t quaternionStatus;
   std::function<void(const Imu::IMUData &)>
   imuDataCallback_; /// Called with IMU data is ready
   std::function<void(const Imu::FilterData &)>

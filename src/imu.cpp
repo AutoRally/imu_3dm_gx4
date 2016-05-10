@@ -37,6 +37,7 @@ extern "C" {
 #define kBufferSize        (10) //  keep this small, or 1000Hz is not attainable
 
 #define u8(x) static_cast<uint8_t>((x))
+#define u32(x) static_cast<uint32_t>((x))
 
 #define COMMAND_CLASS_BASE    u8(0x01)
 #define COMMAND_CLASS_3DM     u8(0x0C)
@@ -49,11 +50,14 @@ extern "C" {
 
 #define SELECTOR_IMU          u8(0x01)
 #define SELECTOR_FILTER       u8(0x03)
+#define SELECTOR_GPS_WEEK     u8(0x01)
+#define SELECTOR_GPS_SECONDS  u8(0x02)
 
 //  base commands
-#define DEVICE_PING           u8(0x01)
-#define DEVICE_IDLE           u8(0x02)
-#define DEVICE_RESUME         u8(0x06) 
+#define DEVICE_PING            u8(0x01)
+#define DEVICE_IDLE            u8(0x02)
+#define DEVICE_RESUME          u8(0x06)
+#define DEVICE_GPS_TIME_UPDATE u8(0x72)
 
 //  3DM and FILTER commands
 #define COMMAND_GET_DEVICE_INFO       u8(0x03)
@@ -70,19 +74,21 @@ extern "C" {
 #define COMMAND_DEVICE_STATUS         u8(0x64)
 
 //  supported fields
-#define FIELD_QUATERNION        u8(0x03)
-#define FIELD_ACCELEROMETER     u8(0x04)
-#define FIELD_GYROSCOPE         u8(0x05)
-#define FIELD_GYRO_BIAS         u8(0x06)
-#define FIELD_MAGNETOMETER      u8(0x06)
-#define FIELD_ANGLE_UNCERTAINTY u8(0x0A)
-#define FIELD_BIAS_UNCERTAINTY  u8(0x0B)
-#define FIELD_BAROMETER         u8(0x17)
-#define FIELD_DEVICE_INFO       u8(0x81)
-#define FIELD_IMU_BASERATE      u8(0x83)
-#define FIELD_FILTER_BASERATE   u8(0x8A)
-#define FIELD_STATUS_REPORT     u8(0x90)
-#define FIELD_ACK_OR_NACK       u8(0xF1)
+#define FIELD_QUATERNION                u8(0x03)
+#define FIELD_ACCELEROMETER             u8(0x04)
+#define FIELD_GYROSCOPE                 u8(0x05)
+#define FIELD_GYRO_BIAS                 u8(0x06)
+#define FIELD_MAGNETOMETER              u8(0x06)
+#define FIELD_ANGLE_UNCERTAINTY         u8(0x0A)
+#define FIELD_BIAS_UNCERTAINTY          u8(0x0B)
+#define FIELD_GPS_CORRELATION_TIMESTAMP u8(0x12)
+#define FIELD_GPS_TIMESTAMP             u8(0x11)
+#define FIELD_BAROMETER                 u8(0x17)
+#define FIELD_DEVICE_INFO               u8(0x81)
+#define FIELD_IMU_BASERATE              u8(0x83)
+#define FIELD_FILTER_BASERATE           u8(0x8A)
+#define FIELD_STATUS_REPORT             u8(0x90)
+#define FIELD_ACK_OR_NACK               u8(0xF1)
 
 using namespace imu_3dm_gx4;
 
@@ -351,8 +357,10 @@ std::map <std::string, unsigned int> Imu::DiagnosticFields::toMap() const {
   map["Selector"] = selector;
   map["Status flags"] = statusFlags;
   map["System timer"] = systemTimer;
-  map["Num 1PPS Pulses"] = num1PPSPulses;
-  map["Last 1PPS Pulse"] = last1PPSPulse;
+  map["Gps Time initialized"] = gpsTimeInit;
+  map["Beacon Good"] = beaconGood;
+  map["Num 1PPS pulses"] = numPPSPulses;
+  map["Quaternion Status"] = quatStatus;
   map["Imu stream enabled"] = imuStreamEnabled;
   map["Filter stream enabled"] = filterStreamEnabled;
   map["Imu packets dropped"] = imuPacketsDropped;
@@ -395,7 +403,7 @@ std::string Imu::timeout_error::generateString(bool write,
 Imu::Imu(const std::string &device, bool verbose) : device_(device), verbose_(verbose),
   fd_(0), 
   rwTimeout_(kDefaultTimeout),
-  srcIndex_(0), dstIndex_(0),
+  srcIndex_(0), dstIndex_(0), gpsTimeRefreshes(0),
   state_(Idle) {
   //  buffer for storing reads
   buffer_.resize(kBufferSize);
@@ -735,10 +743,14 @@ void Imu::getDiagnosticInfo(Imu::DiagnosticFields &fields) {
     decoder.extract(2, &fields.imuStreamEnabled);
     decoder.extract(13, &fields.imuPacketsDropped);
   }
+  fields.gpsTimeInit = gpsTimeInitialized;
+  fields.numPPSPulses = gpsTimeRefreshes;
+  fields.quatStatus = quaternionStatus;
+  fields.beaconGood = ppsBeaconGood;
 }
 
 void Imu::setIMUDataRate(uint16_t decimation, 
-                        const std::bitset<4>& sources) {
+                        const std::bitset<5>& sources) {
   Imu::Packet p(COMMAND_CLASS_3DM);  //  was 0x04
   PacketEncoder encoder(p);
   
@@ -746,7 +758,8 @@ void Imu::setIMUDataRate(uint16_t decimation,
   static const uint8_t fieldDescs[] = { FIELD_ACCELEROMETER, 
                                         FIELD_GYROSCOPE, 
                                         FIELD_MAGNETOMETER, 
-                                        FIELD_BAROMETER };
+                                        FIELD_BAROMETER,
+                                        FIELD_GPS_CORRELATION_TIMESTAMP};
   assert(sizeof(fieldDescs) == sources.size());
   std::vector<uint8_t> fields;
   
@@ -761,20 +774,21 @@ void Imu::setIMUDataRate(uint16_t decimation,
   for (const uint8_t& field : fields) {
     encoder.append(field, decimation);
   }
-  
+
   encoder.endField();
   p.calcChecksum();
   sendCommand(p);
 }
 
-void Imu::setFilterDataRate(uint16_t decimation, const std::bitset<4>& sources) {
+void Imu::setFilterDataRate(uint16_t decimation, const std::bitset<5>& sources) {
   Imu::Packet p(COMMAND_CLASS_3DM);  //  was 0x04
   PacketEncoder encoder(p);
  
   static const uint8_t fieldDescs[] = { FIELD_QUATERNION,
                                         FIELD_GYRO_BIAS,
                                         FIELD_ANGLE_UNCERTAINTY,
-                                        FIELD_BIAS_UNCERTAINTY };
+                                        FIELD_BIAS_UNCERTAINTY,
+                                        FIELD_GPS_TIMESTAMP};
   assert(sizeof(fieldDescs) == sources.size());
   std::vector<uint8_t> fields;
   
@@ -790,6 +804,7 @@ void Imu::setFilterDataRate(uint16_t decimation, const std::bitset<4>& sources) 
   for (const uint8_t& field : fields) {
     encoder.append(field, decimation);
   }
+
   encoder.endField();
   p.calcChecksum();
   sendCommand(p);
@@ -877,6 +892,10 @@ void Imu::enableFilterStream(bool enabled) {
     assert(p.checkMSB == 0x06 && p.checkLSB == 0x1E);
   }
   sendCommand(p);
+}
+
+void Imu::enableGpsTimeSync(bool enabled) {
+  gpsSync_ = enabled;
 }
 
 void
@@ -1059,6 +1078,12 @@ void Imu::processPacket() {
         decoder.extract(1, &data.pressure);
         data.fields |= IMUData::Barometer;
         break;
+      case FIELD_GPS_CORRELATION_TIMESTAMP:
+        decoder.extract(1, &data.gpsTow);
+        decoder.extract(1, &data.gpsWeek);
+        decoder.extract(1, &data.gpsTimeStatus);
+        data.fields |= IMUData::GpsTime;
+        break;
       default:
         std::stringstream ss;
         ss << "Unsupported field in IMU packet: " << std::hex << d;
@@ -1076,6 +1101,7 @@ void Imu::processPacket() {
       case FIELD_QUATERNION:
         decoder.extract(4, &filterData.quaternion[0]);
         decoder.extract(1, &filterData.quaternionStatus);
+        quaternionStatus = filterData.quaternionStatus;
         filterData.fields |= FilterData::Quaternion;
         break;
       case FIELD_GYRO_BIAS:
@@ -1092,6 +1118,21 @@ void Imu::processPacket() {
         decoder.extract(3, &filterData.biasUncertainty[0]);
         decoder.extract(1, &filterData.biasUncertaintyStatus);
         filterData.fields |= FilterData::BiasUncertainty;
+        break;
+      case FIELD_GPS_TIMESTAMP:
+        decoder.extract(1, &filterData.gpsTow);
+        decoder.extract(1, &filterData.gpsWeek);
+        decoder.extract(1, &filterData.gpsTimeStatus);
+        ppsBeaconGood = filterData.gpsTimeStatus & 0x01;
+        gpsTimeInitialized = filterData.gpsTimeStatus & 0x04;
+        if ((filterData.gpsTimeStatus & 0x02) != previousTimeRefresh) {
+          gpsTimeRefreshes ++;
+          previousTimeRefresh = filterData.gpsTimeStatus & 0x02;
+        }
+        //std::cout << "Filter gpsweek: " << filterData.gpsWeek;
+        //std::cout << " gpstow: " << filterData.gpsTow;
+        //std::cout << " gpsFlags: " << filterData.gpsTimeStatus << std::endl;
+        filterData.fields |= FilterData::GpsTime;
         break;
       default:
         std::stringstream ss;
@@ -1218,3 +1259,18 @@ void Imu::sendCommand(const Packet &p, bool readReply) {
     receiveResponse(p, rwTimeout_);
   }
 }
+
+void Imu::sendGpsTimeUpdate(uint32_t week, uint32_t second) {
+  Imu::Packet p(COMMAND_CLASS_BASE);  //  was 0x02
+  PacketEncoder encoder(p);
+  encoder.beginField(DEVICE_GPS_TIME_UPDATE);
+  encoder.append(FUNCTION_APPLY, SELECTOR_GPS_WEEK, u32(week));
+  encoder.endField();
+
+  encoder.beginField(DEVICE_GPS_TIME_UPDATE);
+  encoder.append(FUNCTION_APPLY, SELECTOR_GPS_SECONDS, u32(second));
+  encoder.endField();
+  p.calcChecksum();
+  sendPacket(p, rwTimeout_);
+}
+
