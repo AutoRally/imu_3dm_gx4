@@ -17,7 +17,6 @@
   <depend>geometry_msgs</depend>
   <depend>roscpp</depend>
   <depend>sensor_msgs</depend>
-  <depend>galt_common</depend>
   <depend>std_msgs</depend>
 
   <export>
