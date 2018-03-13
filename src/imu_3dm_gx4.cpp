@@ -27,6 +27,7 @@ Imu *imuInstance;
 
 Imu::Info info;
 Imu::DiagnosticFields fields;
+bool enableMagnetometer;
 
 int gpsTimeFudge;   // Fudge factor if the imu time is off by a second...
 
@@ -43,10 +44,12 @@ void publishData(const Imu::IMUData &data) {
   //  assume we have all of these since they were requested
   /// @todo: Replace this with a mode graceful failure...
   assert(data.fields & Imu::IMUData::Accelerometer);
-  assert(data.fields & Imu::IMUData::Magnetometer);
   assert(data.fields & Imu::IMUData::Barometer);
   assert(data.fields & Imu::IMUData::Gyroscope);
-
+  //  only check the mag if it's enabled
+  if (enableMagnetometer) {
+    assert(data.fields & Imu::IMUData::Magnetometer);
+  }
   // Assume if we are getting GpsTime fields from the imu, we should send time updates
   bool gpsTimeMode = data.fields & Imu::IMUData::GpsTime;
 
@@ -82,12 +85,15 @@ void publishData(const Imu::IMUData &data) {
   } else {
     imu.header.stamp = ros::Time::now();
   }
+
   //  timestamp identically
   imu.header.frame_id = frameId;
-  field.header.stamp = imu.header.stamp;
-  field.header.frame_id = frameId;
   pressure.header.stamp = imu.header.stamp;
   pressure.header.frame_id = frameId;
+  if (enableMagnetometer) {
+    field.header.stamp = imu.header.stamp;
+    field.header.frame_id = frameId;
+  }
 
   imu.orientation_covariance[0] =
       -1; //  orientation data is on a separate topic
@@ -99,16 +105,20 @@ void publishData(const Imu::IMUData &data) {
   imu.angular_velocity.y = data.gyro[1];
   imu.angular_velocity.z = data.gyro[2];
 
-  field.magnetic_field.x = data.mag[0];
-  field.magnetic_field.y = data.mag[1];
-  field.magnetic_field.z = data.mag[2];
-
   pressure.fluid_pressure = data.pressure;
+
+  if (enableMagnetometer) {
+    field.magnetic_field.x = data.mag[0];
+    field.magnetic_field.y = data.mag[1];
+    field.magnetic_field.z = data.mag[2];
+  }
 
   //  publish
   pubIMU.publish(imu);
-  pubMag.publish(field);
   pubPressure.publish(pressure);
+  if (enableMagnetometer) {
+    pubMag.publish(field);
+  }
   if (imuDiag) {
     imuDiag->tick(imu.header.stamp);
   }
@@ -195,7 +205,7 @@ void updateDiagnosticInfo(diagnostic_updater::DiagnosticStatusWrapper& stat,
   
   try {
     //  try to read diagnostic info
-    imu->getDiagnosticInfo(fields);
+    imu->getDiagnosticInfo(fields, info);
     
     auto map = fields.toMap();
     for (const std::pair<std::string, unsigned int>& p : map) {
@@ -224,9 +234,10 @@ int main(int argc, char **argv) {
   //  load parameters from launch file
   nh.param<std::string>("device", device, "/dev/ttyACM0");
   nh.param<int>("baudrate", baudrate, 115200);
-  nh.param<std::string>("frameId", frameId, std::string("imu"));
+  nh.param<std::string>("frame_id", frameId, std::string("imu"));
   nh.param<int>("imu_rate", requestedImuRate, 100);
   nh.param<int>("filter_rate", requestedFilterRate, 100);
+  nh.param<bool>("enable_magnetometer", enableMagnetometer, true);
   nh.param<bool>("enable_filter", enableFilter, false);
   nh.param<bool>("enable_mag_update", enableMagUpdate, false);
   nh.param<bool>("enable_accel_update", enableAccelUpdate, true);
@@ -240,9 +251,11 @@ int main(int argc, char **argv) {
   }
   
   pubIMU = nh.advertise<sensor_msgs::Imu>("imu", 1);
-  pubMag = nh.advertise<sensor_msgs::MagneticField>("magnetic_field", 1);
   pubPressure = nh.advertise<sensor_msgs::FluidPressure>("pressure", 1);
 
+  if (enableMagnetometer) {
+    pubMag = nh.advertise<sensor_msgs::MagneticField>("magnetic_field", 1);
+  }
   if (enableFilter) {
     pubFilter = nh.advertise<imu_3dm_gx4::FilterOutput>("filter", 1);
   }
