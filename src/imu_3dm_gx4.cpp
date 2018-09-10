@@ -137,7 +137,6 @@ void publishFilter(const Imu::FilterData &data) {
 
   imu_3dm_gx4::FilterOutput output;
   if (gpsTimeMode) {
-    ros::Time currentTime = ros::Time::now();
     ros::Time timeStamp;
     double ipart;
     double fpart = modf(data.gpsTow, &ipart);
